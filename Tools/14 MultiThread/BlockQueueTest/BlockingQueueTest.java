@@ -1,21 +1,21 @@
 package com.pierre.blockingqueue;
 
-import java.awt.geom.QuadCurve2D;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
-import java.lang.reflect.Field;
 import java.util.Scanner;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
-
-import javax.swing.text.AbstractDocument.DefaultDocumentEvent;
 
 public class BlockingQueueTest {
 
 	/**
 	 * 程序演示如何使用阻塞队列来控制线程集
 	 * 程序在一个目录以及它的所有子目录下面搜索所有文件，打印出包含指定关键字的行
+	 * 阻塞队列中方的是文件，
+	 * 阻塞队列的大小是10，有put和take，怎么确保存取平衡？这里取决于阻塞队列的线程安全，put take存取的时候会等待，不会抛出空指针
+	 * take方法：获取并移除此双端队列表示的队列的头部（即此双端队列的第一个元素），必要时将一直等待可用元素。
+	 * put方法：将指定的元素插入此双端队列表示的队列中（即此双端队列的尾部），必要时将一直等待可用空间。
 	 * @param args
 	 */
 	public static void main(String[] args) {
@@ -31,7 +31,10 @@ public class BlockingQueueTest {
 		
 		BlockingQueue<File> queue = new ArrayBlockingQueue<File>(FILE_QUEUE_SIZE);
 		FileEnumerationTask enumerator = new FileEnumerationTask(queue, new File(directory));
+		//开始检索线程, FileEnumerationTask类实现类Runnable接口，并实现run方法，然后通过Thread的start方法启动线程。
+		//起一个线程，递归检索目录和子目录，把目录下的文件都装进阻塞队列中
 		new Thread(enumerator).start();
+		//最多起一百个搜索线程
 		for (int i = 0; i <= SEARCH_THREADS; i++) {
 			new Thread(new SearchTask(queue, keyboard)).start();;
 		}
@@ -49,6 +52,7 @@ public class BlockingQueueTest {
 class FileEnumerationTask implements Runnable{
 	//创建一个空文件，作为搜索结束标志
 	public static File DUMMY = new File("");
+	//阻塞队列
 	private BlockingQueue<File> queue;
 	private File startingDirectory;
 	
@@ -105,8 +109,10 @@ class SearchTask implements Runnable{
 		try {
 			boolean done = false;
 			while (!done) {
+				//获取并移除此双端队列表示的队列的头部（即此双端队列的第一个元素），必要时将一直等待可用元素。
 				File file = queue.take();
 				if (file == FileEnumerationTask.DUMMY) {
+					//将指定的元素插入此双端队列表示的队列中（即此双端队列的尾部），必要时将一直等待可用空间。
 					queue.put(file);
 					done = true;
 				}else {
@@ -121,6 +127,7 @@ class SearchTask implements Runnable{
 	}
 	
 	public void search(File file) throws IOException{
+		//文本扫描器，从文件输入流扫描
 		Scanner in = new Scanner(new FileInputStream(file));
 		int lineNumber = 0;
 		while (in.hasNextLine()) {
